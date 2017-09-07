@@ -19,7 +19,7 @@ current status in `/vehicle/traffic_lights` message. You can use this message to
 as well as to verify your TL classifier.
 '''
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 20 # Number of waypoints we will publish. You can change this number
 CRUISE_VELOCITY = 9 # roughly 20 MPH in M/S
 
 
@@ -43,7 +43,7 @@ class WaypointUpdater(object):
     def pose_cb(self, msg):
         """Receives a PoseStamped message containing a Header and a Pose"""
         rospy.loginfo(rospy.get_name() + ': pose received')
-        self.current_pose = msg.Pose
+        self.current_pose = msg.pose
         # TODO: should this be the only time this is called?
         self.update_waypoints()
 
@@ -88,6 +88,7 @@ class WaypointUpdater(object):
         # TODO header?
         lane = Lane()
         lane.waypoints = output_waypoints
+        rospy.loginfo(rospy.get_name() + ': waypoints published')
         self.final_waypoints_pub.publish(lane)
 
     def get_closest_waypoint_index(self):
@@ -96,7 +97,7 @@ class WaypointUpdater(object):
         min_dist = None
 
         for i in range(len(self.base_waypoints)):
-            dist = dl(self.base_waypoints[i].pose.pose.position, self.current_pose.pose.position)
+            dist = dl(self.base_waypoints[i].pose.pose.position, self.current_pose.position)
             if not min_dist or min_dist > dist:
                 min_idx = i
                 min_dist = dist
