@@ -40,6 +40,8 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.current_pose = None
 
+        self.loop()
+
         rospy.spin()
 
     def pose_cb(self, msg):
@@ -105,6 +107,14 @@ class WaypointUpdater(object):
                 min_dist = dist
             
         return min_idx
+
+    def loop(self):
+
+        rate = rospy.Rate(20)
+        
+        while not rospy.is_shutdown():
+            self.update_waypoints()
+            rate.sleep()
 
 
 if __name__ == '__main__':

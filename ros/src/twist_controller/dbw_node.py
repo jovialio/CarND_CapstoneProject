@@ -7,6 +7,7 @@ from geometry_msgs.msg import TwistStamped
 import math
 
 from twist_controller import Controller
+from yaw_controller import YawController
 
 '''
 You can build this node only after you have built (or partially built) the `waypoint_updater` node.
@@ -57,27 +58,34 @@ class DBWNode(object):
         # self.controller = TwistController(<Arguments you wish to provide>)
 
         # TODO: Subscribe to all the topics you need to
+
         # TwistStamped linear and angular velocity target
-        rospy.Subscriber('/twist_cmd', TwistStamped, self.linear_angular_vel_target_cb)
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
         # TwistStamped current linear velocity
-        rospy.Subscriber('/current_velocity', TwistStamped, self.curr_linear_vel_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
         # Bool dbw_enabled
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
 
-        self.linear_angular_vel_target_msg = None
-        self.curr_linear_vel_msg = None
+        self.target_linear_vel = None
+        self.target_angular_vel = None
+        self.current_linear_vel = None
+        self.current_angular_vel = None
         self.dbw_enabled_msg = None
+
+        self.yaw_controller = YawController(wheel_base, steer_ratio, 0, max_lat_accel, max_steer_angle)
 
         self.loop()
 
-    def linear_angular_vel_target_cb(self, msg):
-        self.linear_angular_vel_target_msg = msg
+    def twist_cmd_cb(self, msg):
+        self.target_linear_vel = msg.twist.linear.x
+        self.target_angular_vel = msg.twist.angular.z
 
-    def curr_linear_vel_cb(self, msg):
-        self.curr_linear_vel_msg = msg
+    def current_velocity_cb(self, msg):
+        self.current_linear_vel = msg.twist.linear.x
+        self.current_angular_vel = msg.twist.angular.z
 
     def dbw_enabled_cb(self, msg):
-        self.dbw_enabled_msg = msg
+        self.dbw_enabled_msg = msg.data
 
     def loop(self):
         # Original 50Hz. Dropped to 10Hz based on Slack feedback
@@ -90,13 +98,16 @@ class DBWNode(object):
             #                                                     <current linear velocity>,
             #                                                     <dbw status>,
             #                                                     <any other argument you need>)
+            throttle = 0.1
+            brake = 0
+            steer = 0
+
             if self.dbw_enabled_msg:
-                throttle = 0.5
-                brake = 0
-                steer = 0
-                if self.linear_angular_vel_target_msg:
-                    steer = self.linear_angular_vel_target_msg.twist.angular.z
+                
+                steer = self.yaw_controller.get_steering(self.target_linear_vel, self.target_angular_vel, self.current_linear_vel)
                 self.publish(throttle, brake, steer)
+            else:
+                self.publish(0, 0, 0)
             rate.sleep()
 
     def publish(self, throttle, brake, steer):
