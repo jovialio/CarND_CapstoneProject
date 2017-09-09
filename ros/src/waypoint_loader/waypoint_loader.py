@@ -35,7 +35,8 @@ class WaypointLoader(object):
             rospy.logerr('%s is not a file', path)
 
     def quaternion_from_yaw(self, yaw):
-        return tf.transformations.quaternion_from_euler(0., 0., yaw)
+        yaw_rad = yaw / 360 * 2 * math.pi
+        return tf.transformations.quaternion_from_euler(0., 0., yaw_rad)
 
     def get_velocity(self, velocity):
         return velocity/3.6
@@ -72,7 +73,7 @@ class WaypointLoader(object):
         return waypoints
 
     def publish(self, waypoints):
-        rate = rospy.Rate(40)
+        rate = rospy.Rate(1) #down from 40 due performance issue on single computer
         while not rospy.is_shutdown():
             lane = Lane()
             lane.header.frame_id = '/world'
