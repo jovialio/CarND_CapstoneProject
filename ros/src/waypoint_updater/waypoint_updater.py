@@ -22,7 +22,7 @@ as well as to verify your TL classifier.
 '''
 
 LOOKAHEAD_WPS = 20 # Number of waypoints we will publish. You can change this number
-CRUISE_VELOCITY = 9 # roughly 20 MPH in M/S
+CRUISE_VELOCITY = 10 # 9 for roughly 20 MPH in M/S
 
 
 class WaypointUpdater(object):
