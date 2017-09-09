@@ -84,8 +84,9 @@ class WaypointUpdater(object):
         output_waypoints = []
 
         for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
-            self.set_waypoint_velocity(self.base_waypoints, i, CRUISE_VELOCITY)
-            output_waypoints.append(self.base_waypoints[i])
+            waypoint_index = i % len(self.base_waypoints)
+            self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
+            output_waypoints.append(self.base_waypoints[waypoint_index])
 
         # TODO header?
         lane = Lane()
