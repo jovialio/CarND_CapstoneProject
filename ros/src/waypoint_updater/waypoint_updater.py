@@ -48,8 +48,6 @@ class WaypointUpdater(object):
         """Receives a PoseStamped message containing a Header and a Pose"""
         rospy.loginfo(rospy.get_name() + ': pose received')
         self.current_pose = msg.pose
-        # TODO: should this be the only time this is called?
-        self.update_waypoints()
 
     def waypoints_cb(self, msg):
         """Receives a Lane message containing a Header and Waypoints"""
@@ -110,7 +108,7 @@ class WaypointUpdater(object):
 
     def loop(self):
 
-        rate = rospy.Rate(20)
+        rate = rospy.Rate(10) #down from 40 due performance issues
         
         while not rospy.is_shutdown():
             self.update_waypoints()

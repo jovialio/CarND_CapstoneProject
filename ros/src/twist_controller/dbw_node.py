@@ -88,7 +88,7 @@ class DBWNode(object):
         self.dbw_enabled_msg = msg.data
 
     def loop(self):
-        # Original 50Hz. Dropped to 10Hz based on Slack feedback
+        # Original 50Hz. Dropped to 10Hz based on Slack feedback on performance issue
         rate = rospy.Rate(10) 
         while not rospy.is_shutdown():
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
@@ -126,7 +126,7 @@ class DBWNode(object):
         bcmd.enable = True
         bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
         bcmd.pedal_cmd = brake
-        self.brake_pub.publish(bcmd)
+        #self.brake_pub.publish(bcmd)
 
 
 if __name__ == '__main__':
