@@ -3,6 +3,7 @@ import rospy
 import numpy as np
 from pid import PID
 from yaw_controller import YawController
+import tf
 
 ONE_MPH = 0.44704
 POLYNOMIAL_ORDER = 3
@@ -52,12 +53,27 @@ class Controller(object):
         if not waypoints or not pose:
             return 0
 
-        lane_x = [waypoint.pose.pose.position.x for waypoint in waypoints]
-        lane_y = [waypoint.pose.pose.position.y for waypoint in waypoints]
         pose_x = pose.position.x
         pose_y = pose.position.y
+        lane_x = []
+        lane_y = []
+
+        quaternion = (
+            pose.orientation.x,
+            pose.orientation.y,
+            pose.orientation.z,
+            pose.orientation.w)
+        euler = tf.transformations.euler_from_quaternion(quaternion)
+        yaw = -euler[2]
+
+        for i in range(len(waypoints)):
+            temp_x = waypoints[i].pose.pose.position.x - pose_x
+            temp_y = waypoints[i].pose.pose.position.y - pose_y
+            # TODO: yaw or -yaw?
+            lane_x.append(temp_x * math.cos(yaw) - temp_y * math.sin(yaw))
+            lane_y.append(temp_x * math.sin(yaw) + temp_y * math.cos(yaw))
 
         polynomial = np.polyfit(lane_x, lane_y, POLYNOMIAL_ORDER)
-        target_y = np.polyval(polynomial, pose_x)
+        target_y = np.polyval(polynomial, 0.0 )
         
-        return target_y - pose_y
+        return target_y #- pose_y ???
