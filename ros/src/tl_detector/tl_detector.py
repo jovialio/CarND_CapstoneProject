@@ -10,6 +10,7 @@ from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import yaml
+import math
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -18,12 +19,13 @@ class TLDetector(object):
         rospy.init_node('tl_detector')
 
         self.pose = None
-        self.waypoints = None
+        self.base_waypoints = None
         self.camera_image = None
         self.lights = []
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+
 
         '''
          /vehicle/traffic_lights provides you with the location of the traffic light in 3D map space and 
@@ -54,8 +56,8 @@ class TLDetector(object):
     def pose_cb(self, msg):
         self.pose = msg
 
-    def waypoints_cb(self, waypoints):
-        self.waypoints = waypoints
+    def waypoints_cb(self, msg):
+        self.base_waypoints = msg.waypoints
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
@@ -101,7 +103,17 @@ class TLDetector(object):
 
         """
         #TODO implement
-        return 0
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+        min_idx = None
+        min_dist = None
+
+        for i in range(len(self.base_waypoints)):
+            dist = dl(self.base_waypoints[i].pose.pose.position, pose.position)
+            if not min_dist or min_dist > dist:
+                min_idx = i
+                min_dist = dist
+
+        return min_idx
 
 
     def project_to_image_plane(self, point_in_world):
@@ -174,15 +186,29 @@ class TLDetector(object):
         """
         light = None
         light_positions = self.config['light_positions']
-        if(self.pose):
+        if(self.pose and self.base_waypoints):
             car_position = self.get_closest_waypoint(self.pose.pose)
 
         #TODO find the closest visible traffic light (if one exists)
 
+        if(self.pose and self.base_waypoints):
+            traffic_light_closest_waypoints = []
+            for position in self.config['light_positions']:
+                pose = Pose()
+                pose.position.x = position[0]
+                pose.position.y = position[1]
+                pose.position.z = 0
+                traffic_light_closest_waypoints.append(self.get_closest_waypoint(pose))
+
+            light_id = min(filter(lambda x: x > car_position,traffic_light_closest_waypoints))
+
+            print(self.lights[0].state)
+            return light_id, self.lights[0].state
+
         if light:
             state = self.get_light_state(light)
             return light_wp, state
-        self.waypoints = None
+        self.base_waypoints = None
         return -1, TrafficLight.UNKNOWN
 
 if __name__ == '__main__':
