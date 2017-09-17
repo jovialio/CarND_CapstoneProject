@@ -40,6 +40,7 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.current_pose = None
         self.max_x_pos = None
+        self.trafficlight = None
 
         self.loop()
 
@@ -60,7 +61,10 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        if msg.data == -1:
+            self.trafficlight = None
+        else:
+            self.trafficlight = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -88,10 +92,21 @@ class WaypointUpdater(object):
         closest_waypoint_index = self.get_closest_waypoint_index()
         output_waypoints = []
 
-        for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
-            waypoint_index = i % len(self.base_waypoints)
-            self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
-            output_waypoints.append(self.base_waypoints[waypoint_index])
+        if self.trafficlight is not None:
+            current_velocity = self.get_waypoint_velocity(self.base_waypoints[closest_waypoint_index])
+            stopping_distance = max(1, self.trafficlight - closest_waypoint_index-20) # Value in waypoints with buffer of 20
+            counter = 1
+            for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
+                waypoint_index = i % len(self.base_waypoints)
+                self.set_waypoint_velocity(self.base_waypoints, waypoint_index, max(0, current_velocity - (current_velocity/stopping_distance*counter)))
+                output_waypoints.append(self.base_waypoints[waypoint_index])
+                counter+=1
+
+        else:
+            for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
+                waypoint_index = i % len(self.base_waypoints)
+                self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
+                output_waypoints.append(self.base_waypoints[waypoint_index])
 
         # TODO header?
         lane = Lane()

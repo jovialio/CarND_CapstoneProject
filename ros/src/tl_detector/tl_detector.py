@@ -202,8 +202,16 @@ class TLDetector(object):
 
             light_id = min(filter(lambda x: x > car_position,traffic_light_closest_waypoints))
 
-            print(self.lights[0].state)
-            return light_id, self.lights[0].state
+            if light_id - 200 < car_position and self.lights[0].state == 0:
+            	#print(light_id)
+            	print("Stop")
+            	return light_id, self.lights[0].state
+
+            else:
+            	#print(light_id)
+            	print("Move")
+            	return -1, TrafficLight.UNKNOWN
+	            
 
         if light:
             state = self.get_light_state(light)
