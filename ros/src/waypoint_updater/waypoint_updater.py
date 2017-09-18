@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 import numpy as np
@@ -33,6 +33,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_vel_cb)
         #rospy.Subscriber('/obstacle_waypoint', TBD, self.obstacle_cb)
 
         self.final_waypoints_pub = rospy.Publisher('/final_waypoints', Lane, queue_size=1)
@@ -41,10 +42,15 @@ class WaypointUpdater(object):
         self.current_pose = None
         self.max_x_pos = None
         self.trafficlight = None
+        self.final_waypoints = None
+        self.current_velocity = None
 
         self.loop()
 
         rospy.spin()
+
+    def current_vel_cb(self, msg):
+        self.current_velocity = msg.twist.linear.x
 
     def pose_cb(self, msg):
         """Receives a PoseStamped message containing a Header and a Pose"""
@@ -93,13 +99,16 @@ class WaypointUpdater(object):
         output_waypoints = []
 
         if self.trafficlight is not None:
-            current_velocity = self.get_waypoint_velocity(self.base_waypoints[closest_waypoint_index])
-            stopping_distance = max(1, self.trafficlight - closest_waypoint_index-20) # Value in waypoints with buffer of 20
+
+            #assume last final waypoints velocity is current velocity
+            stopping_distance_waypoints = max(1, self.trafficlight - closest_waypoint_index-5) # Value in waypoints with buffer of 5. max to avoid division by 0
+            velocity_step_decrease = self.current_velocity / stopping_distance_waypoints
             counter = 1
             for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
                 waypoint_index = i % len(self.base_waypoints)
-                self.set_waypoint_velocity(self.base_waypoints, waypoint_index, max(0, current_velocity - (current_velocity/stopping_distance*counter)))
+                self.set_waypoint_velocity(self.base_waypoints, waypoint_index, max(0, self.current_velocity - (velocity_step_decrease*counter)))
                 output_waypoints.append(self.base_waypoints[waypoint_index])
+                #increase counter value for more aggressive braking
                 counter+=1
 
         else:
@@ -110,6 +119,7 @@ class WaypointUpdater(object):
 
         # TODO header?
         lane = Lane()
+        self.final_waypoints = output_waypoints
         lane.waypoints = output_waypoints
         rospy.loginfo(rospy.get_name() + ': waypoints published')
         self.final_waypoints_pub.publish(lane)

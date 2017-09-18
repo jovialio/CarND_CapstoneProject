@@ -13,6 +13,7 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
+STOPPING_DIST = 100
 
 class TLDetector(object):
     def __init__(self):
@@ -202,7 +203,14 @@ class TLDetector(object):
 
             light_id = min(filter(lambda x: x > car_position,traffic_light_closest_waypoints))
 
-            if light_id - 200 < car_position and self.lights[0].state == 0:
+            print(light_id - car_position)
+
+            distance_from_trafficlight = math.sqrt((self.base_waypoints[light_id].pose.pose.position.x-self.base_waypoints[car_position].pose.pose.position.x)**2 + 
+            										(self.base_waypoints[light_id].pose.pose.position.y-self.base_waypoints[car_position].pose.pose.position.y)**2  + 
+            										(self.base_waypoints[light_id].pose.pose.position.z-self.base_waypoints[car_position].pose.pose.position.z)**2)
+            print(distance_from_trafficlight)
+
+            if distance_from_trafficlight < STOPPING_DIST and self.lights[0].state == 0:
             	#print(light_id)
             	print("Stop")
             	return light_id, self.lights[0].state
