@@ -31,6 +31,7 @@ class WaypointLoader(object):
             waypoints = self.load_waypoints(path)
             self.publish(waypoints)
             rospy.loginfo('Waypoint Loded')
+            self.pub.unregister()
         else:
             rospy.logerr('%s is not a file', path)
 

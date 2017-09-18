@@ -13,7 +13,7 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
-STOPPING_DIST = 100
+STOPPING_DIST = 200
 
 class TLDetector(object):
     def __init__(self):
@@ -185,7 +185,9 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        if self.waypoints:
+        if self.base_waypoints:
+            start_time = rospy.get_rostime().nsecs
+
             light = None
             light_positions = self.config['light_positions']
             if (self.pose):
@@ -201,27 +203,32 @@ class TLDetector(object):
 
                 light_waypoint_idx = self.get_closest_waypoint(pos)
                 if light_waypoint_idx >= car_position and \
-                                        light_waypoint_idx - car_position < 100:
+                                        light_waypoint_idx - car_position < STOPPING_DIST:
                     if not min_light_idx or min_light_idx > light_waypoint_idx:
                         min_light_idx = light_waypoint_idx
                 else:
-                    if len(self.waypoints) - car_position < 50 and \
-                                                    len(self.waypoints) - car_position + light_waypoint_idx < 100:
+                    if len(self.base_waypoints) - car_position < 50 and \
+                                                    len(self.base_waypoints) - car_position + light_waypoint_idx < STOPPING_DIST:
 
                         if not min_light_idx or min_light_idx > light_waypoint_idx:
                             min_light_idx = light_waypoint_idx
             if min_light_idx:
                 light = TrafficLight()
-                light.pose = self.waypoints[min_light_idx].pose
+                light.pose = self.base_waypoints[min_light_idx].pose
 
             if light:
                 state = self.get_light_state(light)
+
                 if state == TrafficLight.RED:
                     rospy.logwarn('LIGHT ahead - RED')
                 else:
                     rospy.logwarn('LIGHT ahead - UNKNOWN')
+                end_time = rospy.get_rostime().nsecs - start_time
+
+                rospy.logwarn('Time taken to classify TL state : ' + str(end_time))
+
                 return min_light_idx, state
-            self.waypoints = None
+            self.base_waypoints = None
 
         return -1, TrafficLight.UNKNOWN
 
