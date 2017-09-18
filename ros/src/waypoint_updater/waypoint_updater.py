@@ -100,7 +100,6 @@ class WaypointUpdater(object):
 
         if self.trafficlight is not None:
 
-            #assume last final waypoints velocity is current velocity
             stopping_distance_waypoints = max(1, self.trafficlight - closest_waypoint_index-5) # Value in waypoints with buffer of 5. max to avoid division by 0
             velocity_step_decrease = self.current_velocity / stopping_distance_waypoints
             counter = 1
