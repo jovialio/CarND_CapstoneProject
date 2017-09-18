@@ -190,9 +190,44 @@ class TLDetector(object):
         if(self.pose and self.base_waypoints):
             car_position = self.get_closest_waypoint(self.pose.pose)
 
+            min_light_idx = None
+
+            # TODO recheck ad organize condition
+            for light_pos in light_positions:
+                pos = Pose()
+                pos.position.x = light_pos[0]
+                pos.position.y = light_pos[1]
+
+                light_waypoint_idx = self.get_closest_waypoint(pos)
+                if light_waypoint_idx >= car_position and \
+                                        light_waypoint_idx - car_position < 150:
+                    if not min_light_idx or min_light_idx > light_waypoint_idx:
+                        min_light_idx = light_waypoint_idx
+                else:
+                    if len(self.base_waypoints) - car_position < 50 and \
+                                                    len(self.base_waypoints) - car_position + light_waypoint_idx < 150:
+
+                        if not min_light_idx or min_light_idx > light_waypoint_idx:
+                            min_light_idx = light_waypoint_idx
+            if min_light_idx:
+                light = TrafficLight()
+                light.pose = self.base_waypoints[min_light_idx].pose
+
+            if light:
+                state = self.get_light_state(light)
+                if state == TrafficLight.RED:
+                    rospy.logwarn('LIGHT ahead - RED')
+                else:
+                    rospy.logwarn('LIGHT ahead - UNKNOWN')
+                return min_light_idx, state
+            self.base_waypoints = None
+
+        return -1, TrafficLight.UNKNOWN
+
         #TODO find the closest visible traffic light (if one exists)
 
-        if(self.pose and self.base_waypoints):
+
+        """
             traffic_light_closest_waypoints = []
             for position in self.config['light_positions']:
                 pose = Pose()
@@ -226,6 +261,7 @@ class TLDetector(object):
             return light_wp, state
         self.base_waypoints = None
         return -1, TrafficLight.UNKNOWN
+        """
 
 if __name__ == '__main__':
     try:
