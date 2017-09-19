@@ -22,7 +22,7 @@ as well as to verify your TL classifier.
 '''
 
 LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
-CRUISE_VELOCITY = 9 # 9 for roughly 20 MPH in M/S
+CRUISE_VELOCITY = 20 # 9 for roughly 20 MPH in M/S
 
 
 class WaypointUpdater(object):
@@ -100,16 +100,31 @@ class WaypointUpdater(object):
 
         if self.trafficlight is not None:
 
-            #assume last final waypoints velocity is current velocity
             stopping_distance_waypoints = max(1, self.trafficlight - closest_waypoint_index-5) # Value in waypoints with buffer of 5. max to avoid division by 0
-            velocity_step_decrease = self.current_velocity / stopping_distance_waypoints
-            counter = 1
+            
             for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
+                
                 waypoint_index = i % len(self.base_waypoints)
-                self.set_waypoint_velocity(self.base_waypoints, waypoint_index, max(0, self.current_velocity - (velocity_step_decrease*counter)))
+
+
+                # move vehicle forward if stopped before stop line
+                if stopping_distance_waypoints > 10 and self.current_velocity < 4:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 2)
+                elif stopping_distance_waypoints > 150:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
+                elif stopping_distance_waypoints > 100:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 15)
+                elif stopping_distance_waypoints > 50:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 10)
+                elif stopping_distance_waypoints > 10:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 5)
+                # set to 0
+                else:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 0)
+
                 output_waypoints.append(self.base_waypoints[waypoint_index])
-                #increase counter value for more aggressive braking
-                counter+=1
+
+               
 
         else:
             for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
