@@ -13,7 +13,8 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
-STOPPING_DIST = 200
+LOOKAHEAD_WAYPOINTS = 100
+MIN_LOOKAHEAD_DIST = 10
 
 class TLDetector(object):
     def __init__(self):
@@ -93,6 +94,23 @@ class TLDetector(object):
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         self.state_count += 1
 
+    def get_closest_waypoint_with_hint(self, pose, start_idx):
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+        min_idx = None
+        min_dist = MIN_LOOKAHEAD_DIST
+        final_idx = start_idx + LOOKAHEAD_WAYPOINTS
+
+        while start_idx < final_idx:
+            i = start_idx % len(self.base_waypoints)
+            dist = dl(self.base_waypoints[i].pose.pose.position, pose.position)
+            if not min_dist or min_dist > dist:
+                min_idx = i
+                min_dist = dist
+
+            start_idx += 1
+
+        return min_idx
+
     def get_closest_waypoint(self, pose):
         """Identifies the closest path waypoint to the given position
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
@@ -103,7 +121,6 @@ class TLDetector(object):
             int: index of the closest waypoint in self.waypoints
 
         """
-        #TODO implement
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
         min_idx = None
         min_dist = None
@@ -128,6 +145,11 @@ class TLDetector(object):
             y (int): y coordinate of target point in image
 
         """
+        x = 0
+        y = 0
+
+        #TODO Use tranform and rotation to calculate 2D position of light in image
+        return (x, y)
 
         fx = self.config['camera_info']['focal_length_x']
         fy = self.config['camera_info']['focal_length_y']
@@ -145,11 +167,6 @@ class TLDetector(object):
 
         except (tf.Exception, tf.LookupException, tf.ConnectivityException):
             rospy.logerr("Failed to find camera to map transform")
-
-        #TODO Use tranform and rotation to calculate 2D position of light in image
-
-        x = 0
-        y = 0
 
         return (x, y)
 
@@ -185,14 +202,12 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        if self.base_waypoints:
-            start_time = rospy.get_rostime().nsecs
+        if self.base_waypoints and self.pose:
+            start_time1 = rospy.get_time()
 
             light = None
             light_positions = self.config['light_positions']
-            if (self.pose):
-                car_position = self.get_closest_waypoint(self.pose.pose)
-
+            car_waypoint_idx = self.get_closest_waypoint(self.pose.pose)
             min_light_idx = None
 
             # TODO recheck ad organize condition
@@ -201,31 +216,28 @@ class TLDetector(object):
                 pos.position.x = light_pos[0]
                 pos.position.y = light_pos[1]
 
-                light_waypoint_idx = self.get_closest_waypoint(pos)
-                if light_waypoint_idx >= car_position and \
-                                        light_waypoint_idx - car_position < STOPPING_DIST:
-                    if not min_light_idx or min_light_idx > light_waypoint_idx:
-                        min_light_idx = light_waypoint_idx
-                else:
-                    if len(self.base_waypoints) - car_position < 50 and \
-                                                    len(self.base_waypoints) - car_position + light_waypoint_idx < STOPPING_DIST:
+                light_waypoint_idx = self.get_closest_waypoint_with_hint(pos, car_waypoint_idx)
+                if light_waypoint_idx and (not min_light_idx or min_light_idx > light_waypoint_idx):
+                    min_light_idx = light_waypoint_idx
 
-                        if not min_light_idx or min_light_idx > light_waypoint_idx:
-                            min_light_idx = light_waypoint_idx
             if min_light_idx:
                 light = TrafficLight()
                 light.pose = self.base_waypoints[min_light_idx].pose
 
+            end_time1 = rospy.get_time() - start_time1
+
             if light:
+                start_time2 = rospy.get_time()
                 state = self.get_light_state(light)
 
                 if state == TrafficLight.RED:
                     rospy.logwarn('LIGHT ahead - RED')
                 else:
                     rospy.logwarn('LIGHT ahead - UNKNOWN')
-                end_time = rospy.get_rostime().nsecs - start_time
+                end_time2 = rospy.get_time() - start_time2
 
-                rospy.logwarn('Time taken to classify TL state : ' + str(end_time))
+                rospy.logwarn('Time taken to find TL: ' + str(end_time1 * 1000) + "ms")
+                rospy.logwarn('Time taken to classify TL state : ' + str(end_time2 * 1000) + "ms")
 
                 return min_light_idx, state
             self.base_waypoints = None
