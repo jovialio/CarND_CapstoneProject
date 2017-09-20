@@ -26,7 +26,7 @@ class TLDetector(object):
         self.lights = []
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
-        sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        self.base_waypoints_sub = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         '''
         /vehicle/traffic_lights provides you with the location of the traffic light in 3D map space and
@@ -35,7 +35,7 @@ class TLDetector(object):
         simulator. When testing on the vehicle, the color state will not be available. You'll need to
         rely on the position of the light and the camera image to predict it.
         '''
-        sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
+        self.traffic_lights_sub = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
         sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
         config_string = rospy.get_param("/traffic_light_config")
@@ -52,6 +52,8 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
 
+        self.close_waypoints = []
+        self.light_waypoints = []
         rospy.spin()
 
     def pose_cb(self, msg):
@@ -59,9 +61,34 @@ class TLDetector(object):
 
     def waypoints_cb(self, msg):
         self.base_waypoints = msg.waypoints
+        stop_positions = self.config['stop_line_positions']
+
+        for stop_pos in stop_positions:
+            pos = PoseStamped()
+            pos.pose.position.x = stop_pos[0]
+            pos.pose.position.y = stop_pos[1]
+
+            stop_waypoint_idx = self.get_closest_waypoint(pos.pose)
+            self.close_waypoints.append((stop_waypoint_idx, stop_pos))
+            rospy.logwarn('Stopline waypoint pre-calculated: waypoint idx ' + str(stop_waypoint_idx) + ' waypoint ' +
+                      str(self.base_waypoints[stop_waypoint_idx].pose.pose.position) + ' : Stop ' + str(pos.pose))
+
+        sorted(self.close_waypoints)
+        rospy.logwarn('Stop waypoints pre-calculated ' + str(self.close_waypoints))
+
+        self.base_waypoints_sub.unregister()
 
     def traffic_cb(self, msg):
-        self.lights = msg.lights
+        if self.base_waypoints:
+            self.lights = msg.lights
+            for light in self.lights:
+                light_waypoint_idx = self.get_closest_waypoint(light.pose.pose)
+                self.light_waypoints.append((light_waypoint_idx, light.pose))
+                rospy.logwarn('Light waypoint pre-calculated: waypoint idx ' + str(light_waypoint_idx) + ' waypoint ' +
+                              str(self.base_waypoints[light_waypoint_idx].pose.pose.position) + ' : light ' + str(light.pose.pose.position))
+
+            sorted(self.light_waypoints)
+            self.traffic_lights_sub.unregister()
 
     def image_cb(self, msg):
         """Identifies red lights in the incoming camera image and publishes the index
@@ -132,6 +159,20 @@ class TLDetector(object):
 
         return min_idx
 
+    def get_closest_waypoint_idx(self, waypoints, reference_idx):
+        min_idx = None
+        for wp in waypoints:
+            end_idx = (reference_idx + LOOKAHEAD_WAYPOINTS) % len(self.base_waypoints)
+            if reference_idx > end_idx:
+                if wp[0] > reference_idx or wp[0] < end_idx:
+                    min_idx = wp[0]
+                    break
+            else:
+                if reference_idx <= end_idx:
+                    if reference_idx < wp[0] < end_idx:
+                        min_idx = wp[0]
+                        break
+        return min_idx
 
     def project_to_image_plane(self, point_in_world):
         """Project point from 3D world coordinates to 2D camera image location
@@ -202,27 +243,28 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        if self.base_waypoints and self.pose:
+        if self.base_waypoints and self.pose and self.light_waypoints:
             start_time1 = rospy.get_time()
 
-            light = None
-            light_positions = self.config['stop_line_positions']
             car_waypoint_idx = self.get_closest_waypoint(self.pose.pose)
-            min_light_idx = None
 
-            # TODO recheck ad organize condition
-            for light_pos in light_positions:
-                pos = Pose()
-                pos.position.x = light_pos[0]
-                pos.position.y = light_pos[1]
+            light = None
 
-                light_waypoint_idx = self.get_closest_waypoint_with_hint(pos, car_waypoint_idx)
-                if light_waypoint_idx and (not min_light_idx or min_light_idx > light_waypoint_idx):
-                    min_light_idx = light_waypoint_idx
-
+            min_light_idx = self.get_closest_waypoint_idx(self.light_waypoints, car_waypoint_idx)
+            min_close_idx = None
             if min_light_idx:
                 light = TrafficLight()
                 light.pose = self.base_waypoints[min_light_idx].pose
+                min_close_idx = self.get_closest_waypoint_idx(self.close_waypoints, car_waypoint_idx)
+
+            #rospy.logwarn('car ' + str(self.base_waypoints[car_waypoint_idx].pose.pose.position))
+            if not min_light_idx:
+                rospy.logwarn('No light ahead')
+            # else:
+            #     rospy.logwarn('Light waypoint ahead: waypoint idx ' + str(min_light_idx) + ' waypoint ' +
+            #                   str(self.base_waypoints[min_light_idx].pose.pose.position))
+            #     rospy.logwarn('Close waypoint ahead: waypoint idx ' + str(min_close_idx) + ' waypoint ' +
+            #                   str(self.base_waypoints[min_close_idx].pose.pose.position))
 
             end_time1 = rospy.get_time() - start_time1
 
@@ -236,10 +278,10 @@ class TLDetector(object):
                     rospy.logwarn('LIGHT ahead - UNKNOWN')
                 end_time2 = rospy.get_time() - start_time2
 
-                rospy.logwarn('Time taken to find TL: ' + str(end_time1 * 1000) + "ms")
-                rospy.logwarn('Time taken to classify TL state : ' + str(end_time2 * 1000) + "ms")
+                rospy.logwarn('Time taken to find TL : ' + str(end_time1 * 1000) + " ms")
+                rospy.logwarn('Time taken to classify TL state : ' + str(end_time2 * 1000) + " ms")
 
-                return min_light_idx, state
+                return min_close_idx, state
             self.base_waypoints = None
 
         return -1, TrafficLight.UNKNOWN
