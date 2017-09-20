@@ -282,7 +282,6 @@ class TLDetector(object):
                 rospy.logwarn('Time taken to classify TL state : ' + str(end_time2 * 1000) + " ms")
 
                 return min_close_idx, state
-            self.base_waypoints = None
 
         return -1, TrafficLight.UNKNOWN
 
