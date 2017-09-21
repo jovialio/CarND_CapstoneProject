@@ -5,14 +5,19 @@ import tensorflow as tf
 from keras import backend as K
 from tensorflow.core.framework import graph_pb2
 from time import time
+import numpy as np
+
 
 class TLClassifier(object):
-    def __init__(self):
+    def __init__(self, classifier, simulator):
+        self.classifier = classifier
+        self.simulator = simulator
+
         K.clear_session()
         self.sess = tf.Session()
         self.graph = self.sess.graph
 
-        with open('classifier_simu.pb', "rb") as f:
+        with open(self.classifier, "rb") as f:
             output_graph_def = graph_pb2.GraphDef()
             output_graph_def.ParseFromString(f.read())
             _ = tf.import_graph_def(output_graph_def, name="")
@@ -29,12 +34,9 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        # Resize image to what the model is trained on
-        img_shape = (224, 224, 3)
-
         with self.graph.as_default():
             start = time()
-            img = cv2.resize(image, (img_shape[0], img_shape[1]), interpolation=cv2.INTER_AREA)
+            img = self.preprocess(image)
 
             preds = self.sess.run(self.softmax, {self.image_input: img[None, :, :, :]})
 
@@ -49,3 +51,28 @@ class TLClassifier(object):
                 return TrafficLight.RED
             else:
                 return TrafficLight.UNKNOWN
+
+    def preprocess(self, image):
+        if self.simulator:
+            # Resize image to what the model is trained on
+            img_shape = (224, 224, 3)
+            img = cv2.resize(image, (img_shape[0], img_shape[1]), interpolation=cv2.INTER_AREA)
+            return img
+        else:
+            # Resize image to what the model is trained on
+            img_shape = (320, 320, 3)
+            img = cv2.resize(image, (img_shape[0], img_shape[1]), interpolation=cv2.INTER_AREA)
+
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+            img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
+            img_clahe_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+
+            img_clahe_gamma_output = self.adjust_gamma(img_clahe_output, gamma=0.75)
+            img = cv2.cvtColor(img_clahe_gamma_output, cv2.COLOR_BGR2RGB)
+            return img
+
+    def adjust_gamma(image, gamma=1.0):
+        invGamma = 1.0 / gamma
+        table = np.array([((i / 255.0) ** invGamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+        return cv2.LUT(image, table)
