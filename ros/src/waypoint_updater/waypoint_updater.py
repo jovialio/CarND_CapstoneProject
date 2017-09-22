@@ -100,7 +100,11 @@ class WaypointUpdater(object):
 
         if self.trafficlight is not None:
 
-            stopping_distance_waypoints = max(1, self.trafficlight - closest_waypoint_index-5) # Value in waypoints with buffer of 5. max to avoid division by 0
+            if self.trafficlight > closest_waypoint_index:
+                stopping_distance_waypoints = self.trafficlight - closest_waypoint_index
+            else:
+                stopping_distance_waypoints = len(self.base_waypoints) + self.trafficlight - closest_waypoint_index
+
             
             for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
                 
@@ -108,7 +112,7 @@ class WaypointUpdater(object):
 
 
                 # move vehicle forward if stopped before stop line
-                if stopping_distance_waypoints > 10 and self.current_velocity < 4:
+                if stopping_distance_waypoints > 5 and self.current_velocity < 4:
                     self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 2)
                 elif stopping_distance_waypoints > 150:
                     self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
@@ -116,8 +120,10 @@ class WaypointUpdater(object):
                     self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 15)
                 elif stopping_distance_waypoints > 50:
                     self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 10)
-                elif stopping_distance_waypoints > 10:
+                elif stopping_distance_waypoints > 15:
                     self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 5)
+                elif stopping_distance_waypoints > 5:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 2)
                 # set to 0
                 else:
                     self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 0)
