@@ -63,13 +63,14 @@ class TLClassifier(object):
             img_shape = (320, 320, 3)
             img = cv2.resize(image, (img_shape[0], img_shape[1]), interpolation=cv2.INTER_AREA)
 
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
-            img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
-            img_clahe_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
-
-            img_clahe_gamma_output = self.adjust_gamma(img_clahe_output, gamma=0.75)
-            img = cv2.cvtColor(img_clahe_gamma_output, cv2.COLOR_BGR2RGB)
+            # Npt using the pre-processing done before training
+            # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            # img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
+            # img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
+            # img_clahe_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+            #
+            # img_clahe_gamma_output = self.adjust_gamma(img_clahe_output, gamma=0.85)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             return img
 
     def adjust_gamma(image, gamma=1.0):
