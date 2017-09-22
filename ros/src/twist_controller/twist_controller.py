@@ -24,8 +24,10 @@ class Controller(object):
 
         self.yaw_controller = YawController(wheel_base, steer_ratio, min_speed, max_lat_accel, max_steer_angle)
 
+        #self.throttle_pid = PID(kp=1.0, ki=0.0, kd=0.0, mn=0, mx=accel_limit)
+        #self.steering_pid = PID(kp=0.1, ki=0.0003, kd=0.1, mn=-max_steer_angle, mx=max_steer_angle)
         self.throttle_pid = PID(kp=1.0, ki=0.0, kd=0.0, mn=0, mx=accel_limit)
-        self.steering_pid = PID(kp=0.1, ki=0.0003, kd=0.1, mn=-max_steer_angle, mx=max_steer_angle)
+        self.steering_pid = PID(kp=0.1, ki=0.0, kd=0.0, mn=-max_steer_angle, mx=max_steer_angle)
         self.timestamp = rospy.get_time()
 
 
@@ -38,7 +40,8 @@ class Controller(object):
         velocity_error = target_linear_vel - current_linear_vel
         throttle = self.throttle_pid.step(velocity_error, sample_time)
 
-        if throttle <= 0:
+        # TODO: <=?
+        if throttle < 0:
             brake = self.wheel_radius * self.vehicle_mass * abs(self.decel_limit)
             throttle = 0
         else:
@@ -48,7 +51,9 @@ class Controller(object):
         steer = self.steering_pid.step(cte, sample_time)
         yaw_steer = self.yaw_controller.get_steering(target_linear_vel, target_angular_vel, current_linear_vel)
 
-        return throttle, brake, steer + yaw_steer
+
+        #return throttle, brake, steer + yaw_steer
+        return throttle, brake,  yaw_steer
 
 
     def cross_track_error(self, waypoints, pose):
@@ -78,4 +83,5 @@ class Controller(object):
         polynomial = np.polyfit(lane_x, lane_y, POLYNOMIAL_ORDER)
         target_y = np.polyval(polynomial, 0.0 )
         
-        return target_y #- pose_y ???
+        #return target_y #- pose_y ???
+        return target_y
