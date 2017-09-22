@@ -110,10 +110,11 @@ class DBWNode(object):
 
         while not rospy.is_shutdown():
 
-            throttle, brake, steer = self.controller.control(self.waypoints, self.current_pose, self.target_linear_vel, self.target_angular_vel, self.current_linear_vel)
-
             if self.dbw_enabled_msg:
+                throttle, brake, steer = self.controller.control(self.waypoints, self.current_pose, self.target_linear_vel, self.target_angular_vel, self.current_linear_vel)
                 self.publish(throttle, brake, steer)
+            else:
+                self.controller.reset()
 
             rate.sleep()
 

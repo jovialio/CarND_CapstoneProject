@@ -51,6 +51,11 @@ class Controller(object):
         return throttle, brake, steer + yaw_steer
 
 
+    def reset(self):
+        self.throttle_pid.reset()
+        self.steering_pid.reset()
+
+
     def cross_track_error(self, waypoints, pose):
         if not waypoints or not pose:
             return 0
