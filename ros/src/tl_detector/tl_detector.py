@@ -13,7 +13,7 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
-LOOKAHEAD_WAYPOINTS = 100
+LOOKAHEAD_WAYPOINTS = 200
 MIN_LOOKAHEAD_DIST = 10
 
 class TLDetector(object):
@@ -24,6 +24,7 @@ class TLDetector(object):
         self.base_waypoints = None
         self.camera_image = None
         self.lights = []
+        self.close_waypoints = []
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         self.base_waypoints_sub = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -58,7 +59,6 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
 
-        self.close_waypoints = []
         self.light_waypoints = []
         rospy.spin()
 
@@ -174,10 +174,9 @@ class TLDetector(object):
                     min_idx = wp[0]
                     break
             else:
-                if reference_idx <= end_idx:
-                    if reference_idx < wp[0] < end_idx:
-                        min_idx = wp[0]
-                        break
+                if reference_idx < wp[0] < end_idx:
+                    min_idx = wp[0]
+                    break
         return min_idx
 
     def project_to_image_plane(self, point_in_world):
