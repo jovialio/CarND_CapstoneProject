@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 import numpy as np
@@ -33,6 +33,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_vel_cb)
         #rospy.Subscriber('/obstacle_waypoint', TBD, self.obstacle_cb)
 
         self.final_waypoints_pub = rospy.Publisher('/final_waypoints', Lane, queue_size=1)
@@ -40,10 +41,16 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.current_pose = None
         self.max_x_pos = None
+        self.trafficlight = None
+        self.final_waypoints = None
+        self.current_velocity = None
 
         self.loop()
 
         rospy.spin()
+
+    def current_vel_cb(self, msg):
+        self.current_velocity = msg.twist.linear.x
 
     def pose_cb(self, msg):
         """Receives a PoseStamped message containing a Header and a Pose"""
@@ -60,7 +67,10 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        if msg.data == -1:
+            self.trafficlight = None
+        else:
+            self.trafficlight = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -88,13 +98,49 @@ class WaypointUpdater(object):
         closest_waypoint_index = self.get_closest_waypoint_index()
         output_waypoints = []
 
-        for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
-            waypoint_index = i % len(self.base_waypoints)
-            self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
-            output_waypoints.append(self.base_waypoints[waypoint_index])
+        if self.trafficlight is not None:
+
+            if self.trafficlight > closest_waypoint_index:
+                stopping_distance_waypoints = self.trafficlight - closest_waypoint_index
+            else:
+                stopping_distance_waypoints = len(self.base_waypoints) + self.trafficlight - closest_waypoint_index
+
+            
+            for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
+                
+                waypoint_index = i % len(self.base_waypoints)
+
+
+                # move vehicle forward if stopped before stop line
+                if stopping_distance_waypoints > 5 and self.current_velocity < 4:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 2)
+                elif stopping_distance_waypoints > 150:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
+                elif stopping_distance_waypoints > 100:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 15)
+                elif stopping_distance_waypoints > 50:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 10)
+                elif stopping_distance_waypoints > 15:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 5)
+                elif stopping_distance_waypoints > 5:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 2)
+                # set to 0
+                else:
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 0)
+
+                output_waypoints.append(self.base_waypoints[waypoint_index])
+
+               
+
+        else:
+            for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
+                waypoint_index = i % len(self.base_waypoints)
+                self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
+                output_waypoints.append(self.base_waypoints[waypoint_index])
 
         # TODO header?
         lane = Lane()
+        self.final_waypoints = output_waypoints
         lane.waypoints = output_waypoints
         rospy.loginfo(rospy.get_name() + ': waypoints published')
         self.final_waypoints_pub.publish(lane)
