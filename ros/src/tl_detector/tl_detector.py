@@ -13,8 +13,7 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
-LOOKAHEAD_WAYPOINTS = 200
-MIN_LOOKAHEAD_DIST = 10
+LOOKAHEAD_WAYPOINTS = 50
 
 class TLDetector(object):
     def __init__(self):
@@ -48,8 +47,6 @@ class TLDetector(object):
 
         self.classifier = rospy.get_param("/classifier")
         self.simulator = rospy.get_param("/simulator")
-        #self.classifier = yaml.load(classifier_string)
-        #self.simulator = yaml.load(simulator_string)
 
         self.light_classifier = TLClassifier(self.classifier, self.simulator)
         self.listener = tf.TransformListener()
@@ -76,12 +73,8 @@ class TLDetector(object):
 
             stop_waypoint_idx = self.get_closest_waypoint(pos.pose)
             self.close_waypoints.append((stop_waypoint_idx, stop_pos))
-            rospy.logwarn('Stopline waypoint pre-calculated: waypoint idx ' + str(stop_waypoint_idx) + ' waypoint ' +
-                      str(self.base_waypoints[stop_waypoint_idx].pose.pose.position) + ' : Stop ' + str(pos.pose))
 
         sorted(self.close_waypoints)
-        rospy.logwarn('Stop waypoints pre-calculated ' + str(self.close_waypoints))
-
         self.base_waypoints_sub.unregister()
 
     def traffic_cb(self, msg):
@@ -90,8 +83,6 @@ class TLDetector(object):
             for light in self.lights:
                 light_waypoint_idx = self.get_closest_waypoint(light.pose.pose)
                 self.light_waypoints.append((light_waypoint_idx, light.pose))
-                rospy.logwarn('Light waypoint pre-calculated: waypoint idx ' + str(light_waypoint_idx) + ' waypoint ' +
-                              str(self.base_waypoints[light_waypoint_idx].pose.pose.position) + ' : light ' + str(light.pose.pose.position))
 
             sorted(self.light_waypoints)
             self.traffic_lights_sub.unregister()
@@ -125,23 +116,6 @@ class TLDetector(object):
         else:
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         self.state_count += 1
-
-    def get_closest_waypoint_with_hint(self, pose, start_idx):
-        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-        min_idx = None
-        min_dist = MIN_LOOKAHEAD_DIST
-        final_idx = start_idx + LOOKAHEAD_WAYPOINTS
-
-        while start_idx < final_idx:
-            i = start_idx % len(self.base_waypoints)
-            dist = dl(self.base_waypoints[i].pose.pose.position, pose.position)
-            if not min_dist or min_dist > dist:
-                min_idx = i
-                min_dist = dist
-
-            start_idx += 1
-
-        return min_idx
 
     def get_closest_waypoint(self, pose):
         """Identifies the closest path waypoint to the given position
@@ -234,8 +208,6 @@ class TLDetector(object):
 
         x, y = self.project_to_image_plane(light.pose.pose.position)
 
-        #TODO use light location to zoom in on traffic light in image
-
         #Get classification
         return self.light_classifier.get_classification(cv_image)
 
@@ -249,43 +221,18 @@ class TLDetector(object):
 
         """
         if self.base_waypoints and self.pose and self.light_waypoints:
-            start_time1 = rospy.get_time()
-
             car_waypoint_idx = self.get_closest_waypoint(self.pose.pose)
-
             light = None
-
             min_light_idx = self.get_closest_waypoint_idx(self.light_waypoints, car_waypoint_idx)
             min_close_idx = None
+
             if min_light_idx:
                 light = TrafficLight()
                 light.pose = self.base_waypoints[min_light_idx].pose
                 min_close_idx = self.get_closest_waypoint_idx(self.close_waypoints, car_waypoint_idx)
 
-            #rospy.logwarn('car ' + str(self.base_waypoints[car_waypoint_idx].pose.pose.position))
-            if not min_light_idx:
-                rospy.logwarn('No light ahead')
-            # else:
-            #     rospy.logwarn('Light waypoint ahead: waypoint idx ' + str(min_light_idx) + ' waypoint ' +
-            #                   str(self.base_waypoints[min_light_idx].pose.pose.position))
-            #     rospy.logwarn('Close waypoint ahead: waypoint idx ' + str(min_close_idx) + ' waypoint ' +
-            #                   str(self.base_waypoints[min_close_idx].pose.pose.position))
-
-            end_time1 = rospy.get_time() - start_time1
-
             if light:
-                start_time2 = rospy.get_time()
                 state = self.get_light_state(light)
-
-                if state == TrafficLight.RED:
-                    rospy.logwarn('LIGHT ahead - RED')
-                else:
-                    rospy.logwarn('LIGHT ahead - UNKNOWN')
-                end_time2 = rospy.get_time() - start_time2
-
-                rospy.logwarn('Time taken to find TL : ' + str(end_time1 * 1000) + " ms")
-                rospy.logwarn('Time taken to classify TL state : ' + str(end_time2 * 1000) + " ms")
-
                 return min_close_idx, state
 
         return -1, TrafficLight.UNKNOWN
