@@ -43,10 +43,6 @@ class TLClassifier(object):
             state = preds.argmax()
             prob = preds[state]
 
-            rospy.logwarn('state ' + str(state))
-            rospy.logwarn('All preds ' + str(preds))
-
-            rospy.logwarn('classification time is ' + str((time() - start) * 1000))
             if state == 1:
                 return TrafficLight.RED
             else:
