@@ -5,9 +5,6 @@ from pid import PID
 from yaw_controller import YawController
 import tf
 
-ONE_MPH = 0.44704
-POLYNOMIAL_ORDER = 3
-
 
 class Controller(object):
     def __init__(self, *args, **kwargs):
@@ -21,10 +18,7 @@ class Controller(object):
         max_steer_angle = kwargs['max_steer_angle']
         self.vehicle_mass = kwargs['vehicle_mass']
         self.wheel_radius = kwargs['wheel_radius']
-
         self.yaw_controller = YawController(wheel_base, steer_ratio, min_speed, max_lat_accel, max_steer_angle)
-
-        #self.throttle_pid = PID(kp=1.0, ki=0.0, kd=0.0, mn=0, mx=accel_limit)
         self.throttle_pid = PID(kp=1.0, ki=0.0, kd=0.0, mn=0, mx=accel_limit)
         self.timestamp = rospy.get_time()
 
@@ -40,8 +34,8 @@ class Controller(object):
         # TODO: check what happens if sample_time is very large
         throttle = self.throttle_pid.step(velocity_error, sample_time)
 
-        # TODO: check this: <= or < ?
-        if throttle < 0:
+        # Needs to be <= so that car actually stops, otherwise goes through lights
+        if throttle <= 0:
             # TODO: why decel not proportional to velocity error ?
             brake = self.wheel_radius * self.vehicle_mass * abs(self.decel_limit)
             throttle = 0
@@ -55,5 +49,3 @@ class Controller(object):
 
     def reset(self):
         self.throttle_pid.reset()
-
-
