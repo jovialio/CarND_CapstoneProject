@@ -22,8 +22,8 @@ as well as to verify your TL classifier.
 '''
 
 LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
-CRUISE_VELOCITY = 20 # 9 for roughly 20 MPH in M/S
-
+CRUISE_VELOCITY = 4.4704 # 9 for roughly 20 MPH in M/S
+TRAFFIC_LIGHT_RANGE = 15
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -34,7 +34,6 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_vel_cb)
-        #rospy.Subscriber('/obstacle_waypoint', TBD, self.obstacle_cb)
 
         self.final_waypoints_pub = rospy.Publisher('/final_waypoints', Lane, queue_size=1)
 
@@ -66,15 +65,10 @@ class WaypointUpdater(object):
             self.max_x_pos = np.max(np.array(waypoints_x))
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
         if msg.data == -1:
             self.trafficlight = None
         else:
             self.trafficlight = msg.data
-
-    def obstacle_cb(self, msg):
-        # TODO: Callback for /obstacle_waypoint message. We will implement it later
-        pass
 
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
@@ -96,41 +90,43 @@ class WaypointUpdater(object):
             return
 
         closest_waypoint_index = self.get_closest_waypoint_index()
+        distance_to_light = None
         output_waypoints = []
 
-        if self.trafficlight is not None:
+        if self.trafficlight is not None and closest_waypoint_index is not None:
+            distance_to_light = self.distance(self.base_waypoints, closest_waypoint_index, self.trafficlight)
 
-            if self.trafficlight > closest_waypoint_index:
-                stopping_distance_waypoints = self.trafficlight - closest_waypoint_index
+        if distance_to_light is not None and distance_to_light < TRAFFIC_LIGHT_RANGE:
+
+            velocity = CRUISE_VELOCITY * distance_to_light / TRAFFIC_LIGHT_RANGE
+            if velocity < 1:
+                velocity = 0;
+
+            if self.trafficlight - closest_waypoint_index > 2:
+                self.set_waypoint_velocity(self.base_waypoints, closest_waypoint_index, velocity)
+                output_waypoints.append(self.base_waypoints[closest_waypoint_index])
+
+                for i in range(closest_waypoint_index + 1, self.trafficlight - 2):
+                    waypoint_index = i % len(self.base_waypoints)
+                    segment_distance = self.distance(self.base_waypoints, waypoint_index - 1, waypoint_index)
+                    decel_velocity = (segment_distance / distance_to_light) * self.current_velocity
+                    velocity -= decel_velocity
+
+                    if velocity < 1:
+                        velocity = 0
+
+                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, velocity)
+                    output_waypoints.append(self.base_waypoints[waypoint_index])
+
+            if self.trafficlight == closest_waypoint_index:
+                self.set_waypoint_velocity(self.base_waypoints, self.trafficlight, 0)
+                output_waypoints.append(self.base_waypoints[self.trafficlight])
+
             else:
-                stopping_distance_waypoints = len(self.base_waypoints) + self.trafficlight - closest_waypoint_index
-
-            
-            for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
-                
-                waypoint_index = i % len(self.base_waypoints)
-
-
-                # move vehicle forward if stopped before stop line
-                if stopping_distance_waypoints > 5 and self.current_velocity < 4:
-                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 2)
-                elif stopping_distance_waypoints > 150:
-                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
-                elif stopping_distance_waypoints > 100:
-                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 15)
-                elif stopping_distance_waypoints > 50:
-                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 10)
-                elif stopping_distance_waypoints > 15:
-                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 5)
-                elif stopping_distance_waypoints > 5:
-                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 2)
-                # set to 0
-                else:
-                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, 0)
-
-                output_waypoints.append(self.base_waypoints[waypoint_index])
-
-               
+                self.set_waypoint_velocity(self.base_waypoints, self.trafficlight - 1, 0)
+                output_waypoints.append(self.base_waypoints[self.trafficlight - 1])
+                self.set_waypoint_velocity(self.base_waypoints, self.trafficlight, 0)
+                output_waypoints.append(self.base_waypoints[self.trafficlight])
 
         else:
             for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
@@ -138,7 +134,6 @@ class WaypointUpdater(object):
                 self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
                 output_waypoints.append(self.base_waypoints[waypoint_index])
 
-        # TODO header?
         lane = Lane()
         self.final_waypoints = output_waypoints
         lane.waypoints = output_waypoints
