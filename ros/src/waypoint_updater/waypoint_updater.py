@@ -39,7 +39,6 @@ class WaypointUpdater(object):
 
         self.base_waypoints = None
         self.current_pose = None
-        self.max_x_pos = None
         self.trafficlight = None
         self.final_waypoints = None
         self.current_velocity = None
@@ -60,9 +59,6 @@ class WaypointUpdater(object):
         """Receives a Lane message containing a Header and Waypoints"""
         rospy.loginfo(rospy.get_name() + ': waypoints received')
         self.base_waypoints = msg.waypoints
-        if not self.max_x_pos:
-            waypoints_x = [waypoint.pose.pose.position.x for waypoint in self.base_waypoints]
-            self.max_x_pos = np.max(np.array(waypoints_x))
 
     def traffic_cb(self, msg):
         if msg.data == -1:
@@ -85,8 +81,7 @@ class WaypointUpdater(object):
         return dist
 
     def update_waypoints(self):
-        if self.current_pose is None or self.base_waypoints is None\
-                or self.max_x_pos is None:
+        if self.current_pose is None or self.base_waypoints is None:
             return
 
         closest_waypoint_index = self.get_closest_waypoint_index()
@@ -140,9 +135,6 @@ class WaypointUpdater(object):
         rospy.loginfo(rospy.get_name() + ': waypoints published')
         self.final_waypoints_pub.publish(lane)
 
-    def normalize(self, x):
-        return self.max_x_pos + x % self.max_x_pos
-
     def get_closest_waypoint_index(self):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
         min_idx = None
@@ -156,20 +148,6 @@ class WaypointUpdater(object):
 
         return min_idx
 
-    def get_closest_waypoint_ahead_index(self):
-        dl = lambda a, b: math.sqrt((self.normalize(a.x) - self.normalize(b.x)) ** 2 +
-                                    (a.y - b.y) ** 2 + (a.z - b.z) ** 2)
-        min_idx = None
-        min_dist = None
-
-        for i in range(len(self.base_waypoints)):
-            dist = dl(self.base_waypoints[i].pose.pose.position, self.current_pose.position)
-            if not min_dist or min_dist > dist and \
-                            self.normalize(self.base_waypoints[i].pose.pose.position.x) > \
-                            self.normalize(self.current_pose.position.x):
-                min_idx = i
-                min_dist = dist
-        return min_idx
 
     def loop(self):
 
