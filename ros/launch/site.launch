@@ -23,4 +23,9 @@
 
     <!--Camera Info Publisher -->
     <include file="$(find camera_info_publisher)/launch/camera_info_publisher.launch"/>
+
+    <!--Classifier -->
+    <param name="classifier" value="$(find tl_detector)/classifier_site.pb" />
+    <param name="simulator" value="false"/>
+
 </launch>

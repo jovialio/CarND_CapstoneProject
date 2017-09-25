@@ -88,11 +88,11 @@ class DBWNode(object):
         self.loop()
 
     def twist_cmd_cb(self, msg):
-        self.target_linear_vel = msg.twist.linear.x
+        self.target_linear_vel = math.sqrt(msg.twist.linear.x**2 + msg.twist.linear.y**2)
         self.target_angular_vel = msg.twist.angular.z
 
     def current_velocity_cb(self, msg):
-        self.current_linear_vel = msg.twist.linear.x
+        self.current_linear_vel = math.sqrt(msg.twist.linear.x**2 + msg.twist.linear.y**2)
         self.current_angular_vel = msg.twist.angular.z
 
     def dbw_enabled_cb(self, msg):
@@ -106,14 +106,15 @@ class DBWNode(object):
 
     def loop(self):
         # Original 50Hz. Drop to 10Hz? based on Slack feedback on performance issue
-        rate = rospy.Rate(10) # 50Hz
+        rate = rospy.Rate(50) # 50Hz
 
         while not rospy.is_shutdown():
 
-            throttle, brake, steer = self.controller.control(self.waypoints, self.current_pose, self.target_linear_vel, self.target_angular_vel, self.current_linear_vel)
-
             if self.dbw_enabled_msg:
+                throttle, brake, steer = self.controller.control(self.waypoints, self.current_pose, self.target_linear_vel, self.target_angular_vel, self.current_linear_vel)
                 self.publish(throttle, brake, steer)
+            else:
+                self.controller.reset()
 
             rate.sleep()
 
