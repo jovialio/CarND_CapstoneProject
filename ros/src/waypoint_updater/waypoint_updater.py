@@ -151,7 +151,7 @@ class WaypointUpdater(object):
 
     def loop(self):
 
-        rate = rospy.Rate(10) #down from 40 due performance issues
+        rate = rospy.Rate(40) #down from 40 due performance issues
         
         while not rospy.is_shutdown():
             self.update_waypoints()

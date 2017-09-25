@@ -106,7 +106,7 @@ class DBWNode(object):
 
     def loop(self):
         # Original 50Hz. Drop to 10Hz? based on Slack feedback on performance issue
-        rate = rospy.Rate(10) # 50Hz
+        rate = rospy.Rate(50) # 50Hz
 
         while not rospy.is_shutdown():
 
