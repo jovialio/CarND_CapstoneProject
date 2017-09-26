@@ -23,5 +23,4 @@
 
     <!--Classifier -->
     <param name="classifier" value="$(find tl_detector)/classifier_simu.pb" />
-    <param name="simulator" value="true"/>
 </launch>

@@ -26,6 +26,5 @@
 
     <!--Classifier -->
     <param name="classifier" value="$(find tl_detector)/classifier_site.pb" />
-    <param name="simulator" value="false"/>
 
 </launch>

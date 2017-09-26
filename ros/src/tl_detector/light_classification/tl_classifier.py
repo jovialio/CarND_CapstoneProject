@@ -5,13 +5,11 @@ import tensorflow as tf
 from keras import backend as K
 from tensorflow.core.framework import graph_pb2
 from time import time
-import numpy as np
 
 
 class TLClassifier(object):
-    def __init__(self, classifier, simulator):
+    def __init__(self, classifier):
         self.classifier = classifier
-        self.simulator = simulator
 
         K.clear_session()
         self.sess = tf.Session()
@@ -49,27 +47,7 @@ class TLClassifier(object):
                 return TrafficLight.UNKNOWN
 
     def preprocess(self, image):
-        if self.simulator:
-            # Resize image to what the model is trained on
-            img_shape = (224, 224, 3)
-            img = cv2.resize(image, (img_shape[0], img_shape[1]), interpolation=cv2.INTER_AREA)
-            return img
-        else:
-            # Resize image to what the model is trained on
-            img_shape = (320, 320, 3)
-            img = cv2.resize(image, (img_shape[0], img_shape[1]), interpolation=cv2.INTER_AREA)
-
-            # Npt using the pre-processing done before training
-            # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            # img_yuv = cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
-            # img_yuv[:, :, 0] = clahe.apply(img_yuv[:, :, 0])
-            # img_clahe_output = cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
-            #
-            # img_clahe_gamma_output = self.adjust_gamma(img_clahe_output, gamma=0.85)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            return img
-
-    def adjust_gamma(image, gamma=1.0):
-        invGamma = 1.0 / gamma
-        table = np.array([((i / 255.0) ** invGamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
-        return cv2.LUT(image, table)
+        # Resize image to what the model is trained on
+        img_shape = (224, 224, 3)
+        img = cv2.resize(image, (img_shape[0], img_shape[1]), interpolation=cv2.INTER_AREA)
+        return img
