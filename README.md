@@ -4,11 +4,11 @@ This is the project repo for the final project of the Udacity Self-Driving Car N
 
 ### Team Members
 
-* [James Hulley](https://github.com/hulleywood)
-* [Dennis Chew](https://github.com/jovialio)
-* [Daniel Hormigo](https://github.com/danielhormigoruiz)
-* [George Zdragkas](https://github.com/geoz)
-* [Amit Jain](https://github.com/amit-jain)
+* [James Hulley](https://github.com/hulleywood) - james.hulley@gmail.com
+* [Dennis Chew](https://github.com/jovialio) - dennischewkt@gmail.com
+* [Daniel Hormigo](https://github.com/danielhormigoruiz) - hormigo@stetter-itq.com
+* [George Zdragkas](https://github.com/geoz) - zdragkasg@gmail.com
+* [Amit Jain](https://github.com/amit-jain) - amitj@ieee.org
 
 ### Installation 
 
