@@ -22,7 +22,7 @@ as well as to verify your TL classifier.
 '''
 
 LOOKAHEAD_WPS = 150 # Number of waypoints we will publish. You can change this number
-TRAFFIC_LIGHT_RANGE = 15
+TRAFFIC_LIGHT_RANGE = 30
 
 class WaypointUpdater(object):
     def __init__(self):
