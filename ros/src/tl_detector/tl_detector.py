@@ -13,7 +13,7 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
-LOOKAHEAD_WAYPOINTS = 50
+LOOKAHEAD_WAYPOINTS = 100
 
 class TLDetector(object):
     def __init__(self):

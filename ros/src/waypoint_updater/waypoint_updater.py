@@ -22,8 +22,7 @@ as well as to verify your TL classifier.
 '''
 
 LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
-CRUISE_VELOCITY = 4.4704 # 9 for roughly 20 MPH in M/S
-TRAFFIC_LIGHT_RANGE = 15
+TRAFFIC_LIGHT_RANGE = 30
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -80,11 +79,21 @@ class WaypointUpdater(object):
             wp1 = i
         return dist
 
+    def clone_waypoint(self, wp):
+        p = Waypoint()
+        p.pose.pose.position.x = wp.pose.pose.position.x
+        p.pose.pose.position.y = wp.pose.pose.position.y
+        p.pose.pose.position.z = wp.pose.pose.position.z
+        p.pose.pose.orientation = wp.pose.pose.orientation
+        p.twist.twist.linear.x = wp.twist.twist.linear.x
+        return p
+
     def update_waypoints(self):
         if self.current_pose is None or self.base_waypoints is None:
             return
 
         closest_waypoint_index = self.get_closest_waypoint_index()
+        target_vel = self.get_waypoint_velocity(self.base_waypoints[closest_waypoint_index])
         distance_to_light = None
         output_waypoints = []
 
@@ -93,13 +102,13 @@ class WaypointUpdater(object):
 
         if distance_to_light is not None and distance_to_light < TRAFFIC_LIGHT_RANGE:
 
-            velocity = CRUISE_VELOCITY * distance_to_light / TRAFFIC_LIGHT_RANGE
+            velocity = target_vel * distance_to_light / TRAFFIC_LIGHT_RANGE
             if velocity < 1:
                 velocity = 0;
 
             if self.trafficlight - closest_waypoint_index > 2:
-                self.set_waypoint_velocity(self.base_waypoints, closest_waypoint_index, velocity)
-                output_waypoints.append(self.base_waypoints[closest_waypoint_index])
+                output_waypoints.append(self.clone_waypoint(self.base_waypoints[closest_waypoint_index]))
+                self.set_waypoint_velocity(output_waypoints, -1, velocity)
 
                 for i in range(closest_waypoint_index + 1, self.trafficlight - 2):
                     waypoint_index = i % len(self.base_waypoints)
@@ -110,24 +119,33 @@ class WaypointUpdater(object):
                     if velocity < 1:
                         velocity = 0
 
-                    self.set_waypoint_velocity(self.base_waypoints, waypoint_index, velocity)
-                    output_waypoints.append(self.base_waypoints[waypoint_index])
+                    output_waypoints.append(self.clone_waypoint(self.base_waypoints[waypoint_index]))
+                    self.set_waypoint_velocity(output_waypoints, -1, velocity)
 
             if self.trafficlight == closest_waypoint_index:
-                self.set_waypoint_velocity(self.base_waypoints, self.trafficlight, 0)
-                output_waypoints.append(self.base_waypoints[self.trafficlight])
+                output_waypoints.append(self.clone_waypoint(self.base_waypoints[self.trafficlight]))
+                self.set_waypoint_velocity(output_waypoints, -1, 0)
 
             else:
-                self.set_waypoint_velocity(self.base_waypoints, self.trafficlight - 1, 0)
-                output_waypoints.append(self.base_waypoints[self.trafficlight - 1])
-                self.set_waypoint_velocity(self.base_waypoints, self.trafficlight, 0)
-                output_waypoints.append(self.base_waypoints[self.trafficlight])
+                output_waypoints.append(self.clone_waypoint(self.base_waypoints[self.trafficlight - 1]))
+                self.set_waypoint_velocity(output_waypoints, -1, 0)
+                output_waypoints.append(self.clone_waypoint(self.base_waypoints[self.trafficlight]))
+                self.set_waypoint_velocity(output_waypoints, -1, 0)
+
+            if len(output_waypoints) < LOOKAHEAD_WPS:
+                remaining_wps = LOOKAHEAD_WPS - len(output_waypoints)
+                for i in range(self.trafficlight, self.trafficlight + remaining_wps):
+                    waypoint_index = i % len(self.base_waypoints)
+                    output_waypoints.append(self.clone_waypoint(self.base_waypoints[waypoint_index]))
+                    self.set_waypoint_velocity(output_waypoints, -1, 0)
 
         else:
+
             for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
                 waypoint_index = i % len(self.base_waypoints)
-                self.set_waypoint_velocity(self.base_waypoints, waypoint_index, CRUISE_VELOCITY)
-                output_waypoints.append(self.base_waypoints[waypoint_index])
+                output_waypoints.append(self.clone_waypoint(self.base_waypoints[waypoint_index]))
+                self.set_waypoint_velocity(output_waypoints, -1, target_vel)
+
 
         lane = Lane()
         self.final_waypoints = output_waypoints
