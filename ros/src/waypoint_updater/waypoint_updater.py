@@ -21,8 +21,9 @@ current status in `/vehicle/traffic_lights` message. You can use this message to
 as well as to verify your TL classifier.
 '''
 
-LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
-TRAFFIC_LIGHT_RANGE = 15
+LOOKAHEAD_WPS = 150 # Number of waypoints we will publish. You can change this number
+CRUISE_VELOCITY = 11.11 # 9 for roughly 20 MPH in M/S
+TRAFFIC_LIGHT_RANGE = 30
 
 class WaypointUpdater(object):
     def __init__(self):
