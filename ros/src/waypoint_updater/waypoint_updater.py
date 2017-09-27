@@ -22,8 +22,7 @@ as well as to verify your TL classifier.
 '''
 
 LOOKAHEAD_WPS = 150 # Number of waypoints we will publish. You can change this number
-CRUISE_VELOCITY = 11.11 # 9 for roughly 20 MPH in M/S
-TRAFFIC_LIGHT_RANGE = 30
+TRAFFIC_LIGHT_RANGE = 15
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -133,7 +132,15 @@ class WaypointUpdater(object):
                 output_waypoints.append(self.clone_waypoint(self.base_waypoints[self.trafficlight]))
                 self.set_waypoint_velocity(output_waypoints, -1, 0)
 
+            if len(output_waypoints) < LOOKAHEAD_WPS:
+                remaining_wps = LOOKAHEAD_WPS - len(output_waypoints)
+                for i in range(self.trafficlight, self.trafficlight + remaining_wps):
+                    waypoint_index = i % len(self.base_waypoints)
+                    output_waypoints.append(self.clone_waypoint(self.base_waypoints[waypoint_index]))
+                    self.set_waypoint_velocity(output_waypoints, -1, 0)
+
         else:
+
             for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
                 waypoint_index = i % len(self.base_waypoints)
                 output_waypoints.append(self.clone_waypoint(self.base_waypoints[waypoint_index]))

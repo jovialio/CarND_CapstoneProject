@@ -88,11 +88,11 @@ class DBWNode(object):
         self.loop()
 
     def twist_cmd_cb(self, msg):
-        self.target_linear_vel = math.sqrt(msg.twist.linear.x**2 + msg.twist.linear.y**2)
+        self.target_linear_vel = msg.twist.linear.x
         self.target_angular_vel = msg.twist.angular.z
 
     def current_velocity_cb(self, msg):
-        self.current_linear_vel = math.sqrt(msg.twist.linear.x**2 + msg.twist.linear.y**2)
+        self.current_linear_vel = msg.twist.linear.x
         self.current_angular_vel = msg.twist.angular.z
 
     def dbw_enabled_cb(self, msg):
