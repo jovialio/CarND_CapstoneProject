@@ -21,9 +21,7 @@ current status in `/vehicle/traffic_lights` message. You can use this message to
 as well as to verify your TL classifier.
 '''
 
-LOOKAHEAD_WPS = 150 # Number of waypoints we will publish. You can change this number
-CRUISE_VELOCITY = 11.11 # 9 for roughly 20 MPH in M/S
-TRAFFIC_LIGHT_RANGE = 30
+LOOKAHEAD_WPS = 50 # Number of waypoints we will publish. You can change this number
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -82,11 +80,22 @@ class WaypointUpdater(object):
 
     def clone_waypoint(self, wp):
         p = Waypoint()
+        p.pose.header = wp.pose.header
         p.pose.pose.position.x = wp.pose.pose.position.x
         p.pose.pose.position.y = wp.pose.pose.position.y
         p.pose.pose.position.z = wp.pose.pose.position.z
-        p.pose.pose.orientation = wp.pose.pose.orientation
+        p.pose.pose.orientation.x = wp.pose.pose.orientation.x
+        p.pose.pose.orientation.y = wp.pose.pose.orientation.y
+        p.pose.pose.orientation.z = wp.pose.pose.orientation.z
+        p.pose.pose.orientation.w = wp.pose.pose.orientation.w
+        p.twist.header = wp.twist.header
         p.twist.twist.linear.x = wp.twist.twist.linear.x
+        p.twist.twist.linear.y = wp.twist.twist.linear.y
+        p.twist.twist.linear.z = wp.twist.twist.linear.z
+        p.twist.twist.angular.x = wp.twist.twist.angular.x
+        p.twist.twist.angular.y = wp.twist.twist.angular.y
+        p.twist.twist.angular.z = wp.twist.twist.angular.z
+
         return p
 
     def update_waypoints(self):
@@ -100,10 +109,13 @@ class WaypointUpdater(object):
 
         if self.trafficlight is not None and closest_waypoint_index is not None:
             distance_to_light = self.distance(self.base_waypoints, closest_waypoint_index, self.trafficlight)
+            lookehead_dist = self.distance(self.base_waypoints, closest_waypoint_index,
+                                           (closest_waypoint_index + LOOKAHEAD_WPS) % len(self.base_waypoints))
 
-        if distance_to_light is not None and distance_to_light < TRAFFIC_LIGHT_RANGE:
+        if distance_to_light is not None and \
+            (self.get_num_waypoints(closest_waypoint_index, self.trafficlight) < LOOKAHEAD_WPS):
 
-            velocity = target_vel * distance_to_light / TRAFFIC_LIGHT_RANGE
+            velocity = target_vel * distance_to_light / lookehead_dist
             if velocity < 1:
                 velocity = 0;
 
@@ -133,18 +145,26 @@ class WaypointUpdater(object):
                 output_waypoints.append(self.clone_waypoint(self.base_waypoints[self.trafficlight]))
                 self.set_waypoint_velocity(output_waypoints, -1, 0)
 
+            for i in range(self.trafficlight, closest_waypoint_index + LOOKAHEAD_WPS):
+                waypoint_index = i % len(self.base_waypoints)
+                output_waypoints.append(self.clone_waypoint(self.base_waypoints[waypoint_index]))
+
         else:
             for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
                 waypoint_index = i % len(self.base_waypoints)
                 output_waypoints.append(self.clone_waypoint(self.base_waypoints[waypoint_index]))
-                self.set_waypoint_velocity(output_waypoints, -1, target_vel)
 
 
         lane = Lane()
         self.final_waypoints = output_waypoints
         lane.waypoints = output_waypoints
-        rospy.loginfo(rospy.get_name() + ': waypoints published')
         self.final_waypoints_pub.publish(lane)
+
+    def get_num_waypoints(self, start, finish):
+        if start < finish:
+            return finish - start
+        else:
+            return len(self.base_waypoints) - start + finish
 
     def get_closest_waypoint_index(self):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
