@@ -142,10 +142,10 @@ class WaypointUpdater(object):
 
         else:
 
-            for i in range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS):
+            for indx, i in enumerate(range(closest_waypoint_index, closest_waypoint_index + LOOKAHEAD_WPS)):
                 waypoint_index = i % len(self.base_waypoints)
                 output_waypoints.append(self.clone_waypoint(self.base_waypoints[waypoint_index]))
-                self.set_waypoint_velocity(output_waypoints, -1, target_vel)
+                self.set_waypoint_velocity(output_waypoints, -1, min(self.current_velocity + 0.6, target_vel))
 
 
         lane = Lane()
