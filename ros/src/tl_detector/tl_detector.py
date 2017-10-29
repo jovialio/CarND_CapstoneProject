@@ -13,18 +13,21 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
-LOOKAHEAD_WAYPOINTS = 100
+LOOKAHEAD_WAYPOINTS_SIMU = 100
+LOOKAHEAD_WAYPOINTS_SITE = 40
 
 class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
 
+        self.site = None
         self.pose = None
         self.base_waypoints = None
         self.camera_image = None
         self.lights = []
         self.close_waypoints = []
         self.light_waypoints = []
+        self.LOOKAHEAD_WAYPOINTS = LOOKAHEAD_WAYPOINTS_SIMU
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -33,6 +36,13 @@ class TLDetector(object):
 
         self.classifier = rospy.get_param("/classifier")
         self.light_classifier = TLClassifier(self.classifier)
+
+        if rospy.has_param('/site'):
+            is_site = rospy.get_param('/site')
+            if is_site:
+                self.site = True
+                self.LOOKAHEAD_WAYPOINTS = LOOKAHEAD_WAYPOINTS_SITE
+                rospy.logwarn('Is site')
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         self.base_waypoints_sub = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -63,6 +73,7 @@ class TLDetector(object):
 
     def waypoints_cb(self, msg):
         self.base_waypoints = msg.waypoints
+        rospy.logwarn('num base waypoints' + str(len(self.base_waypoints)))
         stop_positions = self.config['stop_line_positions']
 
         for stop_pos in stop_positions:
@@ -112,8 +123,11 @@ class TLDetector(object):
             light_wp = light_wp if state == TrafficLight.RED else -1
             self.last_wp = light_wp
             self.upcoming_red_light_pub.publish(Int32(light_wp))
+            rospy.logwarn('       State selected ' + str(self.state))
         else:
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
+            rospy.logwarn('       State relayed ' + str(self.last_state))
+
         self.state_count += 1
 
     def get_closest_waypoint(self, pose):
@@ -141,15 +155,22 @@ class TLDetector(object):
     def get_closest_waypoint_idx(self, waypoints, reference_idx):
         min_idx = None
         for wp in waypoints:
-            end_idx = (reference_idx + LOOKAHEAD_WAYPOINTS) % len(self.base_waypoints)
-            if reference_idx > end_idx:
-                if wp[0] > reference_idx or wp[0] < end_idx:
+            # Checking the rosbag of the submission the waypoints were inversely setup to the car direction
+            # So, simply check that the light is within the lookahead waypoints
+            if self.site:
+                if abs(wp[0] - reference_idx) < self.LOOKAHEAD_WAYPOINTS:
                     min_idx = wp[0]
                     break
             else:
-                if reference_idx < wp[0] < end_idx:
-                    min_idx = wp[0]
-                    break
+                end_idx = (reference_idx + self.LOOKAHEAD_WAYPOINTS) % len(self.base_waypoints)
+                if reference_idx >= end_idx:
+                    if wp[0] >= reference_idx and wp[0] >= end_idx:
+                        min_idx = wp[0]
+                        break
+                else:
+                    if reference_idx < wp[0] < end_idx:
+                        min_idx = wp[0]
+                        break
         return min_idx
 
     def project_to_image_plane(self, point_in_world):
@@ -203,7 +224,10 @@ class TLDetector(object):
             return False
 
         self.camera_image.encoding = "rgb8"
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        if self.site:
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
+        else:
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         x, y = self.project_to_image_plane(light.pose.pose.position)
 
@@ -221,6 +245,11 @@ class TLDetector(object):
         """
         if self.base_waypoints and self.pose and self.light_waypoints:
             car_waypoint_idx = self.get_closest_waypoint(self.pose.pose)
+
+            if self.site:
+                rospy.logwarn('car pose x ' + str(self.pose.pose.position.x))
+                rospy.logwarn('car_waypoint_idx ' + str(car_waypoint_idx))
+
             light = None
             min_light_idx = self.get_closest_waypoint_idx(self.light_waypoints, car_waypoint_idx)
             min_close_idx = None
