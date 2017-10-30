@@ -123,10 +123,8 @@ class TLDetector(object):
             light_wp = light_wp if state == TrafficLight.RED else -1
             self.last_wp = light_wp
             self.upcoming_red_light_pub.publish(Int32(light_wp))
-            rospy.logwarn('       State selected ' + str(self.state))
         else:
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-            rospy.logwarn('       State relayed ' + str(self.last_state))
 
         self.state_count += 1
 
@@ -247,8 +245,8 @@ class TLDetector(object):
             car_waypoint_idx = self.get_closest_waypoint(self.pose.pose)
 
             if self.site:
-                rospy.logwarn('car pose x ' + str(self.pose.pose.position.x))
-                rospy.logwarn('car_waypoint_idx ' + str(car_waypoint_idx))
+                rospy.logdebug('car pose x ' + str(self.pose.pose.position.x))
+                rospy.logdebug('car_waypoint_idx ' + str(car_waypoint_idx))
 
             light = None
             min_light_idx = self.get_closest_waypoint_idx(self.light_waypoints, car_waypoint_idx)

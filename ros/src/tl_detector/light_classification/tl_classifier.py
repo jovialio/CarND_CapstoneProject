@@ -4,24 +4,14 @@ import rospy
 import tensorflow as tf
 from keras import backend as K
 from tensorflow.core.framework import graph_pb2
-from time import time
 import numpy as np
-import os
 
 class TLClassifier(object):
     def __init__(self, classifier):
         self.classifier = classifier
-        self.index = 0
         K.clear_session()
         self.sess = tf.Session()
         self.graph = self.sess.graph
-
-        # if not os.path.isdir('output'):
-        #     os.mkdir('output')
-        # if not os.path.isdir('output' + '/0'):
-        #     os.mkdir('output' + '/0')
-        # if not os.path.isdir('output' + '/1'):
-        #     os.mkdir('output' + '/1')
 
         with open(self.classifier, "rb") as f:
             output_graph_def = graph_pb2.GraphDef()
@@ -41,19 +31,16 @@ class TLClassifier(object):
 
         """
         with self.graph.as_default():
-            start = time()
             img = self.preprocess(image)
 
             preds = self.sess.run(self.softmax, {self.image_input: img[None, :, :, :]})
-
             state = np.argmax(preds)
-            #cv2.imwrite(os.path.join('output' + '/' + str(state), str(self.index) + ".jpg"), img)
-            self.index = self.index + 1
+
             if state == 1:
-                rospy.logwarn("Light detected - RED")
+                rospy.logdebug("Light detected - RED")
                 return TrafficLight.RED
             else:
-                rospy.logwarn("No Light detected")
+                rospy.logdebug("No Light detected")
                 return TrafficLight.UNKNOWN
 
     def preprocess(self, image):
